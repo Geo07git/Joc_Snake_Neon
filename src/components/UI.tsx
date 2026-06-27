@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ExternalLink, Trophy } from 'lucide-react';
 
 export function UI() {
-  const { gameState, playerId, joinGame } = useGameStore();
+  const { gameState, playerId, joinGame, isLocalMode } = useGameStore();
 
   const player = playerId && gameState ? gameState.players[playerId] : null;
   const isAlive = player?.state === 'alive';
@@ -23,9 +23,14 @@ export function UI() {
       {/* Top Bar */}
       <div className="flex justify-between items-start pointer-events-auto relative">
         <div className="flex flex-col gap-2 z-10">
-          <h1 className="text-3xl font-black text-white tracking-tighter" style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
-            NEON.SNAKE
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-black text-white tracking-tighter" style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
+              NEON.SNAKE
+            </h1>
+            <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${isLocalMode ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'}`}>
+              {isLocalMode ? 'Local Bot Mode' : 'Live Multiplayer'}
+            </span>
+          </div>
           {isAlive && (
             <div className="text-xl font-mono text-white/80 font-bold">
               Length: {Math.floor(player.score)}

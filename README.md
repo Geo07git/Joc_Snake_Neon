@@ -6,7 +6,7 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/bundled/neon_snake_3d
+View your app in AI Studio: https://ai.studio/apps/28758b49-7b3a-489f-8854-de5c6b3b08af
 
 ## Run Locally
 

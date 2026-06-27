@@ -6,11 +6,20 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGameStore, globalGameState } from '../store/gameStore';
-import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED } from '../shared/types';
+import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED, SEGMENT_SPACING } from '../shared/types';
 import * as THREE from 'three';
 import { Sphere, Grid } from '@react-three/drei';
 
 const localCollectedOrbs = new Set<string>();
+
+const NEON_COLORS = [
+  '#ff7eb3', // vibrant pink
+  '#ffb86c', // vibrant orange
+  '#f1fa8c', // vibrant yellow
+  '#50fa7b', // vibrant green
+  '#8be9fd', // vibrant blue
+  '#bd93f9', // vibrant purple
+];
 
 function Snake({ playerId, color, isLocal }: { playerId: string, color: string, isLocal: boolean }) {
   const bodyRef = useRef<THREE.InstancedMesh>(null);
@@ -166,11 +175,12 @@ function Orbs() {
 }
 
 export function GameScene() {
-  const { gameState, playerId, sendPlayerState, sendCollectOrb } = useGameStore();
+  const { gameState, playerId, sendPlayerState, sendCollectOrb, isLocalMode } = useGameStore();
   const { camera } = useThree();
   const inputs = useRef({ left: false, right: false, boost: false });
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const [lightTarget] = useState(() => new THREE.Object3D());
+  const lastLeaderboardUpdate = useRef(0);
 
   const localPlayerRef = useRef<{
     active: boolean;
@@ -219,7 +229,180 @@ export function GameScene() {
   useFrame((state, delta) => {
     const gs = globalGameState.current;
     if (!gs || !playerId) return;
-    
+
+    if (isLocalMode) {
+      // 1. Spawning random orbs in local mode
+      if (Math.random() < 0.02 && Object.keys(gs.orbs).length < 250) {
+        const id = 'orb-rand-' + Math.random();
+        gs.orbs[id] = {
+          id,
+          x: (Math.random() - 0.5) * WORLD_SIZE,
+          y: (Math.random() - 0.5) * WORLD_SIZE,
+          value: 1,
+          color: NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)],
+        };
+      }
+
+      // 2. Simulating bots in local mode
+      Object.values(gs.players).forEach((p) => {
+        if (p.id === playerId) return; // Skip human player
+
+        if (p.state === 'dead') {
+          // Slowly respawn dead bots
+          if (Math.random() < 0.005) {
+            const bX = (Math.random() - 0.5) * (WORLD_SIZE - 20);
+            const bY = (Math.random() - 0.5) * (WORLD_SIZE - 20);
+            const bAngle = Math.random() * Math.PI * 2;
+            const bSegments = [];
+            const bLength = 8 + Math.floor(Math.random() * 8);
+            for (let i = 0; i < bLength; i++) {
+              bSegments.push({
+                x: bX - Math.cos(bAngle) * i * SEGMENT_SPACING,
+                y: bY - Math.sin(bAngle) * i * SEGMENT_SPACING,
+              });
+            }
+            p.state = 'alive';
+            p.segments = bSegments;
+            p.score = bLength;
+            p.currentAngle = bAngle;
+            p.isBoosting = false;
+          }
+          return;
+        }
+
+        // Steer bot
+        // Avoid boundary
+        const boundLimit = WORLD_SIZE / 2 - 12;
+        const botHead = p.segments[0];
+        if (!botHead) return;
+
+        let steered = false;
+        if (Math.abs(botHead.x) > boundLimit || Math.abs(botHead.y) > boundLimit) {
+          const centerAngle = Math.atan2(-botHead.y, -botHead.x);
+          let diff = centerAngle - p.currentAngle;
+          diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+          p.currentAngle += Math.min(Math.max(diff, -TURN_SPEED * delta), TURN_SPEED * delta);
+          steered = true;
+        }
+
+        // If not steered by boundary, steer towards nearby orbs or other snakes
+        if (!steered) {
+          // Wiggle a little
+          p.currentAngle += (Math.random() - 0.5) * 1.5 * delta;
+
+          // Find closest orb
+          let closestOrb = null;
+          let minDistSq = 625; // 25 units max search
+          for (const orbId in gs.orbs) {
+            const orb = gs.orbs[orbId];
+            const dx = orb.x - botHead.x;
+            const dy = orb.y - botHead.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < minDistSq) {
+              minDistSq = distSq;
+              closestOrb = orb;
+            }
+          }
+
+          if (closestOrb) {
+            const targetAngle = Math.atan2(closestOrb.y - botHead.y, closestOrb.x - botHead.x);
+            let diff = targetAngle - p.currentAngle;
+            diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+            p.currentAngle += Math.min(Math.max(diff, -TURN_SPEED * 0.4 * delta), TURN_SPEED * 0.4 * delta);
+          }
+        }
+
+        // Move bot forward
+        const bSpeed = p.isBoosting ? BOOST_SPEED : BASE_SPEED;
+        const newHead = {
+          x: botHead.x + Math.cos(p.currentAngle) * bSpeed * delta,
+          y: botHead.y + Math.sin(p.currentAngle) * bSpeed * delta,
+        };
+
+        const boundary = WORLD_SIZE / 2;
+        if (newHead.x < -boundary) newHead.x = -boundary;
+        if (newHead.x > boundary) newHead.x = boundary;
+        if (newHead.y < -boundary) newHead.y = -boundary;
+        if (newHead.y > boundary) newHead.y = boundary;
+
+        p.segments.unshift(newHead);
+
+        // Consume boosting score
+        if (p.isBoosting) {
+          p.score -= 2 * delta;
+          if (p.score <= 10) {
+            p.isBoosting = false;
+            p.score = 10;
+          }
+        } else if (Math.random() < 0.005 && p.score > 15) {
+          p.isBoosting = true;
+        }
+
+        const bTargetLength = Math.floor(p.score);
+        while (p.segments.length > bTargetLength) {
+          p.segments.pop();
+        }
+
+        // Check orb collection for bot
+        for (const orbId in gs.orbs) {
+          const orb = gs.orbs[orbId];
+          const dx = newHead.x - orb.x;
+          const dy = newHead.y - orb.y;
+          if (dx * dx + dy * dy < 4) {
+            p.score += orb.value;
+            delete gs.orbs[orbId];
+          }
+        }
+
+        // Check collision for bot
+        let botCollided = false;
+        for (const otherId in gs.players) {
+          if (otherId === p.id) continue;
+          const other = gs.players[otherId];
+          if (other.state !== 'alive') continue;
+          for (const seg of other.segments) {
+            const dx = newHead.x - seg.x;
+            const dy = newHead.y - seg.y;
+            if (dx * dx + dy * dy < 2.25) {
+              botCollided = true;
+              break;
+            }
+          }
+          if (botCollided) break;
+        }
+
+        if (botCollided) {
+          p.state = 'dead';
+          p.segments.forEach((seg, idx) => {
+            if (idx % 2 === 0) {
+              const oId = 'orb-' + Math.random();
+              gs.orbs[oId] = {
+                id: oId,
+                x: seg.x,
+                y: seg.y,
+                value: 1,
+                color: p.color,
+              };
+            }
+          });
+        }
+      });
+
+      // 3. Update leaderboard
+      const now = Date.now();
+      if (now - lastLeaderboardUpdate.current > 200) {
+        const sortedLeaderboard = Object.values(gs.players)
+          .filter(p => p.state === 'alive')
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10)
+          .map(p => ({ id: p.id, name: p.name, score: Math.floor(p.score), color: p.color }));
+        
+        gs.leaderboard = sortedLeaderboard;
+        useGameStore.setState({ gameState: { ...gs } });
+        lastLeaderboardUpdate.current = now;
+      }
+    }
+
     const serverPlayer = gs.players[playerId];
     if (serverPlayer && serverPlayer.state === 'alive') {
       
