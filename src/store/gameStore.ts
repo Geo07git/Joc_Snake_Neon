@@ -29,6 +29,11 @@ const COLORS = [
 ];
 
 export const globalGameState: { current: GameState | null } = { current: null };
+export const activeInputs = {
+  left: false,
+  right: false,
+  boost: false,
+};
 let lastUiUpdate = 0;
 
 export const useGameStore = create<GameStore>((set, get) => ({

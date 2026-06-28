@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, activeInputs } from '../store/gameStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, Trophy } from 'lucide-react';
+import { ExternalLink, Trophy, ArrowLeft, ArrowRight, Zap } from 'lucide-react';
 
 export function UI() {
   const { gameState, playerId, joinGame, isLocalMode } = useGameStore();
@@ -13,6 +13,31 @@ export function UI() {
   const player = playerId && gameState ? gameState.players[playerId] : null;
   const isAlive = player?.state === 'alive';
   const isDead = player?.state === 'dead';
+
+  const handleLeftStart = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    activeInputs.left = true;
+  };
+  const handleLeftEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    activeInputs.left = false;
+  };
+  const handleRightStart = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    activeInputs.right = true;
+  };
+  const handleRightEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    activeInputs.right = false;
+  };
+  const handleBoostStart = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    activeInputs.boost = true;
+  };
+  const handleBoostEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    activeInputs.boost = false;
+  };
 
   const handleOpenNewTab = () => {
     window.open(window.location.href, '_blank');
@@ -62,23 +87,67 @@ export function UI() {
 
       {/* Leaderboard */}
       {gameState && gameState.leaderboard.length > 0 && (
-        <div className="absolute top-20 right-4 w-64 bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/10 pointer-events-auto">
-          <div className="flex items-center gap-2 mb-4 text-white/80 font-semibold">
-            <Trophy size={18} className="text-yellow-400" />
+        <div className="absolute top-20 right-4 w-48 sm:w-64 bg-black/40 backdrop-blur-md rounded-2xl p-3 sm:p-4 border border-white/10 pointer-events-auto max-h-[40vh] overflow-y-auto">
+          <div className="flex items-center gap-2 mb-2 sm:mb-4 text-white/80 font-semibold text-xs sm:text-sm">
+            <Trophy size={16} className="text-yellow-400" />
             <h2>LEADERBOARD</h2>
           </div>
-          <div className="flex flex-col gap-2">
-            {gameState.leaderboard.map((entry, i) => (
-              <div key={entry.id} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2 truncate">
+          <div className="flex flex-col gap-1.5 sm:gap-2">
+            {gameState.leaderboard.slice(0, 5).map((entry, i) => (
+              <div key={entry.id} className="flex justify-between items-center text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5 sm:gap-2 truncate">
                   <span className="text-white/40 w-4">{i + 1}.</span>
-                  <span style={{ color: entry.color }} className="font-medium truncate max-w-[120px]">
+                  <span style={{ color: entry.color }} className="font-medium truncate max-w-[80px] sm:max-w-[120px]">
                     {entry.name}
                   </span>
                 </div>
                 <span className="font-mono text-white/80">{entry.score}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Touch Controls */}
+      {isAlive && (
+        <div className="absolute bottom-6 left-0 right-0 px-6 flex justify-between items-end pointer-events-none md:hidden z-10">
+          {/* Left / Right Steering Buttons */}
+          <div className="flex gap-4 pointer-events-auto">
+            <button
+              onTouchStart={handleLeftStart}
+              onTouchEnd={handleLeftEnd}
+              onMouseDown={handleLeftStart}
+              onMouseUp={handleLeftEnd}
+              onMouseLeave={handleLeftEnd}
+              className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/40 text-blue-400 flex items-center justify-center backdrop-blur-md active:bg-blue-500/30 active:scale-95 transition-all select-none outline-none shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+            >
+              <ArrowLeft size={28} />
+            </button>
+            <button
+              onTouchStart={handleRightStart}
+              onTouchEnd={handleRightEnd}
+              onMouseDown={handleRightStart}
+              onMouseUp={handleRightEnd}
+              onMouseLeave={handleRightEnd}
+              className="w-16 h-16 rounded-full bg-pink-500/10 border border-pink-500/40 text-pink-400 flex items-center justify-center backdrop-blur-md active:bg-pink-500/30 active:scale-95 transition-all select-none outline-none shadow-[0_0_15px_rgba(236,72,153,0.2)]"
+            >
+              <ArrowRight size={28} />
+            </button>
+          </div>
+
+          {/* Boost Button */}
+          <div className="pointer-events-auto">
+            <button
+              onTouchStart={handleBoostStart}
+              onTouchEnd={handleBoostEnd}
+              onMouseDown={handleBoostStart}
+              onMouseUp={handleBoostEnd}
+              onMouseLeave={handleBoostEnd}
+              className="w-20 h-20 rounded-full bg-amber-500/10 border-2 border-amber-500/50 text-amber-400 flex flex-col items-center justify-center backdrop-blur-md active:bg-amber-500/30 active:scale-95 transition-all select-none outline-none shadow-[0_0_20px_rgba(245,158,11,0.3)]"
+            >
+              <Zap size={28} className="animate-pulse" />
+              <span className="text-[9px] font-mono font-black tracking-widest mt-0.5">BOOST</span>
+            </button>
           </div>
         </div>
       )}
@@ -103,7 +172,7 @@ export function UI() {
               {!isDead && (
                 <div className="text-center">
                   <h2 className="text-3xl font-black text-white mb-2">JOIN ARENA</h2>
-                  <p className="text-white/60 text-sm">Steer with A/D or Left/Right. Space to boost.</p>
+                  <p className="text-white/60 text-sm">Steer with A/D, Left/Right or touch buttons. Boost with Space or the Boost button.</p>
                 </div>
               )}
               

@@ -21,6 +21,7 @@ export default function App() {
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       <Canvas
         shadows
+        dpr={[1, 1.5]}
         camera={{ position: [0, 0, 50], fov: 60 }}
         gl={{ antialias: false }}
       >

@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useGameStore, globalGameState } from '../store/gameStore';
+import { useGameStore, globalGameState, activeInputs } from '../store/gameStore';
 import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED, SEGMENT_SPACING } from '../shared/types';
 import * as THREE from 'three';
 import { Sphere, Grid } from '@react-three/drei';
@@ -416,11 +416,11 @@ export function GameScene() {
 
       if (!localPlayerRef.current.active) return;
 
-      // Local movement logic
-      if (inputs.current.left) localPlayerRef.current.currentAngle += TURN_SPEED * delta;
-      if (inputs.current.right) localPlayerRef.current.currentAngle -= TURN_SPEED * delta;
+      // Local movement logic (support keyboard & touch inputs)
+      if (inputs.current.left || activeInputs.left) localPlayerRef.current.currentAngle += TURN_SPEED * delta;
+      if (inputs.current.right || activeInputs.right) localPlayerRef.current.currentAngle -= TURN_SPEED * delta;
       
-      localPlayerRef.current.isBoosting = inputs.current.boost && localPlayerRef.current.score > 10;
+      localPlayerRef.current.isBoosting = (inputs.current.boost || activeInputs.boost) && localPlayerRef.current.score > 10;
       const speed = localPlayerRef.current.isBoosting ? BOOST_SPEED : BASE_SPEED;
       
       const head = { ...localPlayerRef.current.segments[0] };
@@ -518,7 +518,11 @@ export function GameScene() {
         localPlayerRef.current.lastSendTime = now;
       }
 
-      const targetZ = Math.min(45, Math.max(20, 20 + localPlayerRef.current.score * 0.2));
+      // Dynamically adjust camera height for mobile portrait/landscape aspect ratio
+      const isPortrait = window.innerHeight > window.innerWidth;
+      const baseZ = isPortrait ? 35 : 20;
+      const maxZ = isPortrait ? 70 : 45;
+      const targetZ = Math.min(maxZ, Math.max(baseZ, baseZ + localPlayerRef.current.score * (isPortrait ? 0.35 : 0.2)));
       
       // Smooth camera follow predicted head
       camera.position.x += (head.x - camera.position.x) * 10 * delta;
