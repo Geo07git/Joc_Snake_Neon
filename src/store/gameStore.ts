@@ -13,10 +13,14 @@ interface GameStore {
   gameState: GameState | null;
   playerId: string | null;
   isLocalMode: boolean;
+  selectedMode: 'single' | 'multi' | null;
   connect: () => void;
+  startSinglePlayer: () => void;
+  startMultiplayer: () => void;
   joinGame: () => void;
   sendPlayerState: (data: any) => void;
   sendCollectOrb: (orbId: string) => void;
+  leaveGame: () => void;
 }
 
 const COLORS = [
@@ -41,11 +45,54 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameState: null,
   playerId: null,
   isLocalMode: false,
+  selectedMode: null,
   connect: () => {
-    if (get().socket || get().isLocalMode) return;
-    
+    // Keep connect as no-op or auto-connection check if needed,
+    // but startMultiplayer/startSinglePlayer are preferred now.
+  },
+  startSinglePlayer: () => {
+    // Clean up active socket if any
+    const { socket } = get();
+    if (socket) {
+      socket.disconnect();
+    }
+
+    const initialOrbs: Record<string, Orb> = {};
+    for (let i = 0; i < 150; i++) {
+      const id = uuidv4();
+      initialOrbs[id] = {
+        id,
+        x: (Math.random() - 0.5) * WORLD_SIZE,
+        y: (Math.random() - 0.5) * WORLD_SIZE,
+        value: 1,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      };
+    }
+
+    const localState: GameState = {
+      players: {},
+      orbs: initialOrbs,
+      leaderboard: [],
+    };
+
+    globalGameState.current = localState;
+    set({
+      socket: null,
+      gameState: localState,
+      playerId: 'local-player',
+      isLocalMode: true,
+      selectedMode: 'single',
+    });
+  },
+  startMultiplayer: () => {
+    const currentSocket = get().socket;
+    if (currentSocket && !get().isLocalMode) {
+      set({ selectedMode: 'multi' });
+      return;
+    }
+
     const socket = io({
-      timeout: 2000,
+      timeout: 3000,
       reconnectionAttempts: 2,
     });
 
@@ -54,7 +101,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.on('connect', () => {
       isConnected = true;
       console.log('Connected to server');
-      set({ socket, isLocalMode: false });
+      set({ socket, isLocalMode: false, selectedMode: 'multi' });
     });
 
     socket.on('init', (id: string) => {
@@ -72,49 +119,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     socket.on('connect_error', () => {
       if (!isConnected) {
-        console.log('Connection failed, starting local mode...');
+        console.log('Connection failed, starting local mode as fallback...');
         socket.disconnect();
-        startLocal();
+        get().startSinglePlayer();
       }
     });
 
-    const fallbackTimeout = setTimeout(() => {
+    setTimeout(() => {
       if (!isConnected) {
-        console.log('Connection timeout, starting local mode...');
+        console.log('Connection timeout, starting local mode as fallback...');
         socket.disconnect();
-        startLocal();
+        get().startSinglePlayer();
       }
-    }, 2000);
-
-    const startLocal = () => {
-      clearTimeout(fallbackTimeout);
-      
-      const initialOrbs: Record<string, Orb> = {};
-      for (let i = 0; i < 150; i++) {
-        const id = uuidv4();
-        initialOrbs[id] = {
-          id,
-          x: (Math.random() - 0.5) * WORLD_SIZE,
-          y: (Math.random() - 0.5) * WORLD_SIZE,
-          value: 1,
-          color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        };
-      }
-
-      const localState: GameState = {
-        players: {},
-        orbs: initialOrbs,
-        leaderboard: [],
-      };
-
-      globalGameState.current = localState;
-      set({
-        socket: null,
-        gameState: localState,
-        playerId: 'local-player',
-        isLocalMode: true,
-      });
-    };
+    }, 3000);
+  },
+  leaveGame: () => {
+    const { socket } = get();
+    if (socket) {
+      socket.disconnect();
+    }
+    globalGameState.current = null;
+    set({
+      socket: null,
+      gameState: null,
+      playerId: null,
+      isLocalMode: false,
+      selectedMode: null,
+    });
   },
   joinGame: () => {
     const { socket, isLocalMode, playerId } = get();

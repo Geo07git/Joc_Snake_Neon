@@ -5,10 +5,19 @@
 
 import { useGameStore, activeInputs } from '../store/gameStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, Trophy, ArrowLeft, ArrowRight, Zap } from 'lucide-react';
+import { ExternalLink, Trophy, ArrowLeft, ArrowRight, Zap, User, Users } from 'lucide-react';
 
 export function UI() {
-  const { gameState, playerId, joinGame, isLocalMode } = useGameStore();
+  const {
+    gameState,
+    playerId,
+    joinGame,
+    isLocalMode,
+    selectedMode,
+    startSinglePlayer,
+    startMultiplayer,
+    leaveGame
+  } = useGameStore();
 
   const player = playerId && gameState ? gameState.players[playerId] : null;
   const isAlive = player?.state === 'alive';
@@ -52,9 +61,11 @@ export function UI() {
             <h1 className="text-3xl font-black text-white tracking-tighter" style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
               NEON.SNAKE
             </h1>
-            <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${isLocalMode ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'}`}>
-              {isLocalMode ? 'Local Bot Mode' : 'Live Multiplayer'}
-            </span>
+            {selectedMode && (
+              <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${isLocalMode ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'}`}>
+                {isLocalMode ? 'Local Bot Mode' : 'Live Multiplayer'}
+              </span>
+            )}
           </div>
           {isAlive && (
             <div className="text-xl font-mono text-white/80 font-bold">
@@ -76,13 +87,23 @@ export function UI() {
           </div>
         </div>
 
-        <button
-          onClick={handleOpenNewTab}
-          className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-sm font-bold transition-colors z-10"
-        >
-          <ExternalLink size={16} />
-          <span>New Tab</span>
-        </button>
+        <div className="flex items-center gap-2 z-10">
+          {selectedMode && (
+            <button
+              onClick={leaveGame}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 rounded-full text-red-400 text-sm font-bold transition-all"
+            >
+              <span>Back to Menu</span>
+            </button>
+          )}
+          <button
+            onClick={handleOpenNewTab}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-sm font-bold transition-colors"
+          >
+            <ExternalLink size={16} />
+            <span>New Tab</span>
+          </button>
+        </div>
       </div>
 
       {/* Leaderboard */}
@@ -154,36 +175,108 @@ export function UI() {
 
       {/* Menus */}
       <AnimatePresence>
-        {(!player || isDead) && (
+        {selectedMode === null ? (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-sm"
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-md z-50"
           >
-            <div className="bg-zinc-900/90 p-8 rounded-3xl border border-white/10 shadow-2xl max-w-md w-full flex flex-col items-center gap-6">
-              {isDead && (
-                <div className="text-center">
-                  <h2 className="text-4xl font-black text-red-500 mb-2">YOU DIED</h2>
-                  <p className="text-white/60">Final Length: {Math.floor(player.score)}</p>
+            <div className="bg-zinc-900/95 p-6 sm:p-8 rounded-3xl border border-white/10 shadow-2xl max-w-xl w-full flex flex-col items-center gap-6 sm:gap-8 mx-4">
+              <div className="text-center">
+                <h2 className="text-4xl font-black text-white tracking-tight mb-2" style={{ textShadow: '0 0 15px rgba(255,255,255,0.3)' }}>
+                  NEON.SNAKE
+                </h2>
+                <p className="text-white/50 text-sm">Select your play style to enter the grid arena</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                {/* Single Player Card */}
+                <div className="flex flex-col justify-between p-5 rounded-2xl bg-gradient-to-b from-blue-500/10 to-transparent border border-blue-500/20 hover:border-blue-500/40 transition-all group">
+                  <div>
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+                      <User className="text-blue-400 w-6 h-6 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1.5">Single Player</h3>
+                    <p className="text-xs text-white/50 leading-relaxed mb-6">
+                      Instantly play offline against 10 responsive AI bots. Perfect for high performance and zero network lag.
+                    </p>
+                  </div>
+                  <button
+                    onClick={startSinglePlayer}
+                    className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.3)] text-sm"
+                  >
+                    PLAY VS BOTS
+                  </button>
                 </div>
-              )}
-              
-              {!isDead && (
-                <div className="text-center">
-                  <h2 className="text-3xl font-black text-white mb-2">JOIN ARENA</h2>
-                  <p className="text-white/60 text-sm">Steer with A/D, Left/Right or touch buttons. Boost with Space or the Boost button.</p>
+
+                {/* Multiplayer Card */}
+                <div className="flex flex-col justify-between p-5 rounded-2xl bg-gradient-to-b from-pink-500/10 to-transparent border border-pink-500/20 hover:border-pink-500/40 transition-all group">
+                  <div>
+                    <div className="w-12 h-12 rounded-xl bg-pink-500/10 flex items-center justify-center mb-4 border border-pink-500/30 shadow-[0_0_15px_rgba(236,72,153,0.15)]">
+                      <Users className="text-pink-400 w-6 h-6 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1.5">Multiplayer</h3>
+                    <p className="text-xs text-white/50 leading-relaxed mb-6">
+                      Join the live online arena. Slither and compete against real players around the globe in real-time.
+                    </p>
+                  </div>
+                  <button
+                    onClick={startMultiplayer}
+                    className="w-full py-3 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(236,72,153,0.3)] text-sm"
+                  >
+                    JOIN LIVE LOBBY
+                  </button>
                 </div>
-              )}
-              
-              <button
-                onClick={joinGame}
-                className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors active:scale-95"
-              >
-                {isDead ? 'RESPAWN' : 'PLAY'}
-              </button>
+              </div>
             </div>
           </motion.div>
+        ) : (
+          (!player || isDead) && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-sm z-40"
+            >
+              <div className="bg-zinc-900/90 p-8 rounded-3xl border border-white/10 shadow-2xl max-w-md w-full flex flex-col items-center gap-6 mx-4">
+                {isDead && (
+                  <div className="text-center">
+                    <h2 className="text-4xl font-black text-red-500 mb-2">YOU DIED</h2>
+                    <p className="text-white/60">Final Length: {Math.floor(player.score)}</p>
+                  </div>
+                )}
+                
+                {!isDead && (
+                  <div className="text-center">
+                    <h2 className="text-3xl font-black text-white mb-2">READY TO SLITHER</h2>
+                    <p className="text-white/60 text-sm">
+                      Mode: <span className="text-white font-bold underline decoration-dotted">{isLocalMode ? 'Single Player (Bots)' : 'Live Multiplayer'}</span>
+                    </p>
+                    <p className="text-white/40 text-xs mt-3 leading-relaxed">
+                      Steer with A/D, Left/Right or touch buttons. Boost with Space or the Boost button.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="w-full flex flex-col gap-3">
+                  <button
+                    onClick={joinGame}
+                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors active:scale-95 text-base"
+                  >
+                    {isDead ? 'RESPAWN' : 'PLAY'}
+                  </button>
+
+                  <button
+                    onClick={leaveGame}
+                    className="w-full py-3 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 font-bold rounded-xl transition-all active:scale-95 text-sm border border-white/5"
+                  >
+                    CHANGE MODE
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )
         )}
       </AnimatePresence>
     </div>

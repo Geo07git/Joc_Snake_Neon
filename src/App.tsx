@@ -11,12 +11,6 @@ import { useGameStore } from './store/gameStore';
 import { UI } from './components/UI';
 
 export default function App() {
-  const { connect } = useGameStore();
-
-  useEffect(() => {
-    connect();
-  }, [connect]);
-
   return (
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       <Canvas
